@@ -21,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/mustafolins/webrtc-fun/issues"
   },
-  "homepage": "https://github.com/mustafolins/webrtc-fun#readme"
+  "homepage": "https://github.com/mustafolins/webrtc-fun#readme",
+  "dependencies": {
+    "ws": "^7.3.1"
+  }
 }

@@ -37,7 +37,8 @@ const handleRequest = function(request, response) {
   } else if(request.url === '/analyze') {
     response.writeHead(200, {'Content-Type': 'text/html'});
     response.end(fs.readFileSync('client/consumerAnalyze.html'));
-  } else if(request.url.includes('shard')){
+  } // send models
+  else if(request.url.includes('shard')){
     response.writeHead(200, {'Content-Type': 'application/octet-stream'})
     response.end(fs.readFileSync('client' + request.url))
   } else if(request.url.includes('/models')){

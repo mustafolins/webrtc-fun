@@ -1,91 +1,128 @@
 var localVideo;
 var localStream;
 var remoteVideo;
-var gotRemote = false;
 var sendingOffer = false;
 var peerConnection;
 var uuid;
 var serverConnection;
+const HTTPS_PORT = 8443;
 
-function pageReady(isCaller) {
+function start(isCaller) {
   uuid = createUUID();
 
+  // get the local video element
   localVideo = document.getElementById('localVideo');
+  // get the remote video element
   remoteVideo = document.getElementById('remoteVideo');
 
-  serverConnection = new WebSocket('wss://' + window.location.hostname + ':8443');
+  // connect to the web socket server
+  serverConnection = new WebSocket('wss://' + window.location.hostname + ':' + HTTPS_PORT);
   serverConnection.onmessage = gotMessageFromServer;
 
+  // is the producer then get media device
   if (isCaller) {
     if (navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({video: true, audio: true}).then(getUserMediaSuccess).catch(errorHandler);
+      // get a media device
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(getUserMediaSuccess).catch(errorHandler);
     } else {
       alert('Your browser does not support getUserMedia API');
     }
   } else {
-    start(isCaller);
+    // not a producer so just initializePeerConnection
+    initializePeerConnection(isCaller);
   }
 }
 
 function shareScreen() {
-  if (navigator.mediaDevices.getDisplayMedia) {
-    navigator.mediaDevices.getDisplayMedia({video: true, audio: true}).then(getUserMediaSuccess).catch(errorHandler);
-  } else {
-    alert('Your browser does not support getDisplayMedia API');
+  // get screen share button
+  var shareScreenBtn = document.getElementById('shareScreenBtn');
+
+  // if share screen then start sharing stream
+  if (shareScreenBtn.value == 'Share Screen') {
+    // if getDisplayMedia function supported
+    if (navigator.mediaDevices.getDisplayMedia) {
+      // then get a display media
+      navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).then(getUserMediaSuccess).catch(errorHandler);
+
+      // update button text
+      shareScreenBtn.value = 'Stop Sharing Screen';
+    } else {
+      alert('Your browser does not support getDisplayMedia API');
+    }
+  } // stop sharing screen by sharing a media device
+  else {
+    if (navigator.mediaDevices.getUserMedia) {
+      // get a media device
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(getUserMediaSuccess).catch(errorHandler);
+
+      // update button text
+      shareScreenBtn.value = 'Share Screen';
+    } else {
+      alert('Your browser does not support getUserMedia API');
+    }
   }
 }
 
 function getUserMediaSuccess(stream) {
   localStream = stream;
+  // set local video source to obtained stream object
   localVideo.srcObject = stream;
 
-  startStreamAndSendOffer();
+  // initialize peer connection and send offer
+  initializePeerConnectAndSendOffer();
 }
 
-function startStreamAndSendOffer() {
-  start(true);
+function initializePeerConnectAndSendOffer() {
+  initializePeerConnection(true);
 
+  // if not sending offer already
   if (!sendingOffer) {
     sendingOffer = true;
+
+    // send offer every 2 seconds so consumers that weren't running can still recieve an offer to connect to the stream
     setInterval(() => {
-      createOffer();
+      sendOffer();
     }, 2000);
   }
 }
 
-function start(isCaller) {
+function initializePeerConnection(isProducer) {
+  // if peer connection isn't already initialized
   if (!peerConnection) {
+    // initialize peer connection
     peerConnection = new RTCPeerConnection();
     peerConnection.onicecandidate = gotIceCandidate;
     peerConnection.ontrack = gotRemoteStream;
   }
 
-  if (isCaller) {
+  // if current client is a producer
+  if (isProducer) {
+    // then add the local stream to the peer connection
     peerConnection.addStream(localStream);
-    createOffer();
+    sendOffer();
   }
 }
 
-function createOffer() {
-  peerConnection.createOffer().then(createdDescription).catch(errorHandler);
+function sendOffer() {
+  peerConnection.createOffer().then(producerGotDescription).catch(errorHandler);
 }
 
 function gotMessageFromServer(message) {
-  if (!peerConnection) start(false);
+  if (!peerConnection) initializePeerConnection(false);
 
   var signal = JSON.parse(message.data);
 
   // Ignore messages from ourself
   if (signal.uuid == uuid) return;
 
-  if (signal.sdp && !gotRemote) {
+  if (signal.sdp) {
     peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp)).then(function () {
       // Only create answers in response to offers
       if (signal.sdp.type == 'offer') {
-        peerConnection.createAnswer().then(createdDescription).catch(errorHandler);
+        peerConnection.createAnswer().then(producerGotDescription).catch(errorHandler);
       }
     }).catch(errorHandler);
-  } else if (signal.ice && !gotRemote) {
+  } else if (signal.ice) {
     peerConnection.addIceCandidate(new RTCIceCandidate(signal.ice)).catch(errorHandler);
   }
 }
@@ -96,7 +133,7 @@ function gotIceCandidate(event) {
   }
 }
 
-function createdDescription(description) {
+function producerGotDescription(description) {
   console.log('got description');
 
   peerConnection.setLocalDescription(description).then(function () {
@@ -105,10 +142,9 @@ function createdDescription(description) {
 }
 
 function gotRemoteStream(event) {
+  // got a remote stream so go ahead and add it to the video source
   console.log('got remote stream');
   remoteVideo.srcObject = event.streams[0];
-
-  gotRemote = true;
 }
 
 function errorHandler(error) {
