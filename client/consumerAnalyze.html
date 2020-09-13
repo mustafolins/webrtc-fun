@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="webrtc.js"></script>
+  <script defer src="face-api.min.js"></script>
+  <script defer src="faceDetection.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      position: absolute;
+    }
+  </style>
+</head>
+
+<body>
+  <video id="remoteVideo" autoplay width="720" height="560"></video>
+
+  <br />
+
+  <script type="text/javascript">
+    pageReady(false);
+  </script>
+</body>
+
+</html>
